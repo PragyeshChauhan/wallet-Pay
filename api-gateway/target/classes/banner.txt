@@ -1,0 +1,16 @@
+   ____                _____ _____  ____   _ __   __                _ _      _                  ____
+  / / /               | ____|__  / |  _ \ / \\ \ / / __      ____ _| | | ___| |_                \ \ \
+ / / /   _____ _____  |  _|   / /  | |_) / _ \\ V /  \ \ /\ / / _` | | |/ _ \ __|  _____ _____   \ \ \
+ \ \ \  |_____|_____| | |___ / /_  |  __/ ___ \| |    \ V  V / (_| | | |  __/ |_  |_____|_____|  / / /
+  \_\_\               |_____/____| |_| /_/   \_\_|     \_/\_/ \__,_|_|_|\___|\__|               /_/_/
+
+:: << ${APP_NAME:EZ PAY Wallet} >> ::
+-------------------------------------------------
+:: Service       ::  ${SERVICE_NAME:api-gateway}
+:: Profile       ::  ${SPRING_PROFILES_ACTIVE:dev}
+:: Port          ::  ${SERVER_PORT:8080}
+:: Java Version  ::  ${JAVA_VERSION:21}
+:: Spring Boot   ::  ${SPRING_BOOT_VERSION:3.5.3}
+:: Started At    ::  ${START_TIME:#{T(java.time.LocalDateTime).now()}}
+:: Author        ::  ${AUTHOR:Pragyesh Chauhan}
+-------------------------------------------------

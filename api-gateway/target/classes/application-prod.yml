@@ -1,0 +1,219 @@
+server:
+  port: 443
+  ssl:
+    enabled: true
+    key-store: file:/etc/ssl/certs/keystore.p12
+    key-store-password: ${vault://secret/keystore-password} # Vault integration
+    key-store-type: PKCS12
+    key-alias: api-gateway
+    client-auth: need
+    trust-store: file:/etc/ssl/certs/truststore.p12
+    trust-store-password: ${vault://secret/truststore-password}
+    trust-store-type: PKCS12
+    enabled-protocols: TLSv1.3
+    ciphers: TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+  http2:
+    enabled: true
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        ssl:
+          useInsecureTrustManager: false
+      routes:
+        - id: payment-service
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/api/payments/**
+          filters:
+            - StripPrefix=1
+            - AddRequestHeader=X-API-Key, ${vault://secret/api-key}
+            - CircuitBreaker=paymentCircuitBreaker
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 1000
+                redis-rate-limiter.burstCapacity: 2000
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET, POST
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  jitter: full # Add jitter for retry
+        - id: user-service
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=1
+            - AddRequestHeader=X-API-Key, ${vault://secret/api-key}
+            - CircuitBreaker=userCircuitBreaker
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 800
+                redis-rate-limiter.burstCapacity: 1600
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET, POST
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  jitter: full
+      default-filters:
+        - name: SecureHeaders
+          args:
+            hsts: max-age=31536000;includeSubDomains
+            content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'
+        - name: Retry
+          args:
+            retries: 3
+            methods: GET, POST
+            backoff:
+              firstBackoff: 50ms
+              maxBackoff: 500ms
+              factor: 2
+              jitter: full
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 5000
+            redis-rate-limiter.burstCapacity: 10000
+    loadbalancer:
+      use404: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://auth.yourdomain.com
+          jwk-set-uri: https://auth.yourdomain.com/.well-known/jwks.json
+
+  redis:
+    host: redis.yourdomain.com
+    port: 6379
+    password: ${vault://secret/redis-password}
+    timeout: 10000ms
+    lettuce:
+      pool:
+        max-active: 500
+        max-idle: 100
+        min-idle: 20
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server.yourdomain.com:8761/eureka/
+    registry-fetch-interval-seconds: 30
+  instance:
+    prefer-ip-address: true
+    hostname: api.yourdomain.com
+    status-page-url: https://${eureka.instance.hostname}/actuator/info
+    health-check-url: https://${eureka.instance.hostname}/actuator/health
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 20
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentCircuitBreaker:
+        slidingWindowSize: 100
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 10
+        minimumNumberOfCalls: 20 # Ensure meaningful stats
+      userCircuitBreaker:
+        slidingWindowSize: 80 # Adjusted for user service
+        failureRateThreshold: 45 # More lenient
+        waitDurationInOpenState: 8000ms
+        permittedNumberOfCallsInHalfOpenState: 8
+        minimumNumberOfCalls: 15
+  retry:
+    instances:
+      default:
+        max-attempts: 3
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff:
+          base-interval: 50ms
+          max-interval: 500ms
+          multiplier: 2
+          randomize: true # Jitter via randomization
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, gateway, prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    gateway:
+      enabled: true
+  server:
+    port: 8081
+    ssl:
+      enabled: true
+      key-store: file:/etc/ssl/certs/keystore.p12
+      key-store-password: ${vault://secret/keystore-password}
+      key-store-type: PKCS12
+  health:
+    mail:
+      enabled: false
+    diskspace:
+      enabled: true
+      path: /var/log/api-gateway
+    datadog:
+      enabled: true
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty: INFO
+    com.ezpay.apigateway: DEBUG
+  file:
+    name: /var/log/api-gateway/api-gateway.log
+    max-size: 10MB
+    max-history: 30
+    total-size-cap: 1GB
+  logback:
+    rollingpolicy:
+      clean-history-on-start: true
+    appender:
+      console:
+        enabled: true
+      file:
+        async: true # Async logging for performance
+
+api:
+  key: ${vault://secret/api-key}
+
+keystore:
+  file: file:/etc/ssl/certs/keystore.p12
+  password: ${vault://secret/keystore-password}
+  type: PKCS12
+truststore:
+  file: file:/etc/ssl/certs/truststore.p12
+  password: ${vault://secret/truststore-password}
+  type: PKCS12
+
+monitoring:
+  alert-thresholds:
+    cpu: ${MONITORING_CPU_THRESHOLD:80%}
+    memory: ${MONITORING_MEMORY_THRESHOLD:90%}
+  slack-webhook: ${vault://secret/slack-webhook}
+  datadog:
+    api-key: ${vault://secret/datadog-api-key}
+    enabled: true
+

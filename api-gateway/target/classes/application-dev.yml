@@ -1,0 +1,212 @@
+
+# Server configuration
+server:
+  port: 8083
+  ssl:
+    enabled: false
+  shutdown: graceful
+  netty:
+    connection-timeout: 30s
+    max-connections: 2000
+
+# Spring application settings
+spring:
+  application:
+    name: api-gateway
+  main:
+    web-application-type: reactive
+
+  # Redis configuration (updated to spring.data.redis)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 5s
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 50
+          max-idle: 10
+          min-idle: 2
+
+  # Kafka configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:6002}
+
+  # Spring Cloud Gateway configuration
+  cloud:
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+          routes:
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/auth/**
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/user/**
+            - id: account-service
+              uri: lb://account-service
+              predicates:
+                - Path=/api/account/**
+              filters:
+                - StripPrefix=1
+            - id: loan-service
+              uri: lb://loan-service
+              predicates:
+                - Path=/api/loan/**
+              filters:
+                - StripPrefix=1
+            - id: creditcard-service
+              uri: lb://creditcard-service
+              predicates:
+                - Path=/api/creditcard/**
+              filters:
+                - StripPrefix=1
+            - id: frauddetection-service
+              uri: lb://frauddetection-service
+              predicates:
+                - Path=/api/fraud/**
+              filters:
+                - StripPrefix=1
+            - id: payment-service
+              uri: lb://payment-service
+              predicates:
+                - Path=/api/payment/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter:
+                      replenishRate: 10
+                      burstCapacity: 20
+                    key-resolver: "#{@ipKeyResolver}"
+                - name: CircuitBreaker
+                  args:
+                    name: paymentCB
+                    fallbackUri: forward:/fallback
+            - id: transaction-service
+              uri: lb://transaction-service
+              predicates:
+                - Path=/api/transaction/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter:
+                      replenishRate: 8
+                      burstCapacity: 16
+                    key-resolver: "#{@ipKeyResolver}"
+                - name: CircuitBreaker
+                  args:
+                    name: transactionCB
+                    fallbackUri: forward:/fallback
+            - id: bankintegration-service
+              uri: lb://bankintegration-service
+              predicates:
+                - Path=/api/bankintegration/**
+              filters:
+                - StripPrefix=1
+            - id: notification-service
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/otp/**
+              filters:
+                - StripPrefix=0
+
+# Eureka client configuration
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+    prefer-ip-address: true
+
+# Management and monitoring endpoints
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    gateway:
+      access: UNRESTRICTED
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  info:
+    env:
+      enabled: true
+
+# Resilience4j configuration for circuit breakers and retries
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 70
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+      transactionCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 60
+        waitDurationInOpenState: 15s
+        permittedNumberOfCallsInHalfOpenState: 2
+  retry:
+    instances:
+      default:
+        maxAttempts: 2
+        waitDuration: 1s
+
+# Authentication settings
+auth:
+  mode: oauth2
+  bypass-paths: /api/auth/access,/api/otp/**,/api/login,/api/user/login,/api/refresh,/api/nonce,/actuator/**,/fallback,/swagger-ui.html,/api-docs/**
+
+# JWT configuration
+jwt:
+  issuer: https://ezpay-auth.com
+  audience: ezyPay
+
+# Springdoc OpenAPI/Swagger configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+
+# Logging configuration
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.security: DEBUG
+
+
+url:
+  service:
+    user: http://user-service
+    auth: http://auth-service
+
