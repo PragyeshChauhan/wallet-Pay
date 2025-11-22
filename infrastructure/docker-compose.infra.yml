@@ -1,0 +1,229 @@
+services:
+  # Zookeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ezypay-zookeeper
+    ports:
+      - "6001:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ezypay-network
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ezypay-kafka
+    ports:
+      - "6002:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - ezypay-network
+
+  # Kafka UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: ezypay-kafka-ui
+    ports:
+      - "6003:8080"
+    environment:
+      SERVER_PORT: 8080
+      KAFKA_CLUSTERS_0_NAME: ezypay-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - ezypay-network
+
+  # Redis for Auth Service
+  redis-auth:
+    image: redis:7.2
+    container_name: redis-auth
+    ports:
+      - "6380:6379"
+    networks:
+      - ezypay-network
+
+  # Redis for Payment Service
+  redis-payment:
+    image: redis:7.2
+    container_name: redis-payment
+    ports:
+      - "6381:6379"
+    networks:
+      - ezypay-network
+
+  # Redis for Fraud Detection Service
+  redis-fraud:
+    image: redis:7.2
+    container_name: redis-fraud
+    ports:
+      - "6382:6379"
+    networks:
+      - ezypay-network
+
+  # Redis for other Service
+  redis-central:
+    image: redis:7.2
+    container_name: redis-central
+    ports:
+      - "6383:6379"
+    networks:
+      - ezypay-network
+
+  # Redis Commander
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    restart: always
+    environment:
+      REDIS_HOSTS: auth=redis-auth:6379,payment=redis-payment:6379,fraud=redis-fraud:6379,central=redis-central:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis-auth
+      - redis-payment
+      - redis-fraud
+      - redis-central
+    networks:
+      - ezypay-network
+
+
+  # PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: ezypay-postgres
+    ports:
+      - "6006:5432"
+    environment:
+      POSTGRES_DB: ezypaydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ezyPay
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - ezypay-network
+
+  # pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ezypay-pgadmin
+    ports:
+      - "6007:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ezypay.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - ezypay-network
+
+  # MySQL
+  mysql:
+    image: mysql:8
+    container_name: ezypay-mysql
+    ports:
+      - "6008:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ezypay
+    volumes:
+      - mysqldata:/var/lib/mysql
+    networks:
+      - ezypay-network
+
+  # Adminer
+  adminer:
+    image: adminer:latest
+    container_name: ezypay-adminer
+    ports:
+      - "6009:8082"
+    environment:
+      ADMINER_DESIGN: pepa
+    networks:
+      - ezypay-network
+
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: ezypay-mongodb
+    ports:
+      - "6010:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    volumes:
+      - mongodata:/data/db
+    networks:
+      - ezypay-network
+
+  # Mongo Express
+  mongo-express:
+    image: mongo-express:latest
+    container_name: ezypay-mongo-ui
+    ports:
+      - "6011:8083"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: root
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    depends_on:
+      - mongodb
+    networks:
+      - ezypay-network
+
+  # Zipkin
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: ezypay-zipkin
+    ports:
+      - "6012:9411"
+    networks:
+      - ezypay-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ezypay-prometheus
+    ports:
+      - "6013:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - ezypay-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ezypay-grafana
+    ports:
+      - "6014:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - ezypay-network
+
+volumes:
+  pgdata:
+  mysqldata:
+  mongodata:
+  pgadmin-data:
+
+networks:
+  ezypay-network:
+    driver: bridge

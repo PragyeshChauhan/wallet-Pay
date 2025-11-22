@@ -1,0 +1,41 @@
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: ezypay-postgres
+    ports:
+      - "6006:5432"
+    environment:
+      POSTGRES_DB: ezypaydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ezyPay
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - ezypay-network
+
+  # pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ezypay-pgadmin
+    ports:
+      - "6007:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ezypay.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - ezypay-network
+volumes:
+  pgdata:
+  mysqldata:
+  pgadmin-data:
+
+networks:
+  ezypay-network:

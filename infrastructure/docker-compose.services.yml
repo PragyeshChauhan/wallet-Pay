@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  eureka-server:
+    build: ./eureka-server
+    ports:
+      - "8761:8761"
+
+  config-server:
+    build: ./config-server
+    depends_on:
+      - eureka-server
+    ports:
+      - "8888:8888"
+
+  auth-service:
+    build: ./auth-service
+    depends_on:
+      - eureka-server
+      - config-server
+    ports:
+      - "8081:8081"
+
+  user-service:
+    build: ./user-service
+    depends_on:
+      - auth-service
+      - eureka-server
+      - config-server
+    ports:
+      - "8082:8082"
+
+  payment-service:
+    build: ./payment-service
+    depends_on:
+      - user-service
+      - eureka-server
+      - config-server
+    ports:
+      - "8083:8083"
+
+  transaction-service:
+    build: ./transaction-service
+    depends_on:
+      - payment-service
+      - eureka-server
+    ports:
+      - "8084:8084"
+
+  frauddetection-service:
+    build: ./frauddetection-service
+    depends_on:
+      - kafka
+      - transaction-service
+    ports:
+      - "8085:8085"
+
+  notification-service:
+    build: ./notification-service
+    depends_on:
+      - redis
+      - kafka
+    ports:
+      - "8086:8086"
+
+  loan-service:
+    build: ./loan-service
+    depends_on:
+      - eureka-server
+      - config-server
+    ports:
+      - "8087:8087"
+
+  creditcard-service:
+    build: ./creditcard-service
+    depends_on:
+      - eureka-server
+      - config-server
+    ports:
+      - "8088:8088"
+
+  account-service:
+    build: ./account-service
+    depends_on:
+      - eureka-server
+      - config-server
+    ports:
+      - "8089:8089"
+
+  bankintegration-service:
+    build: ./bankintegration-service
+    depends_on:
+      - eureka-server
+      - config-server
+    ports:
+      - "8090:8090"
+
+  infra-service:
+    build: ./infra-service
+    depends_on:
+      - eureka-server
+      - config-server
+    ports:
+      - "8091:8091"
+
+  api-gateway:
+    build: ./api-gateway
+    depends_on:
+      - auth-service
+      - user-service
+      - transaction-service
+      - payment-service
+      - eureka-server
+      - config-server
+    ports:
+      - "8080:8080"

@@ -1,0 +1,37 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.ezpay.wallet</groupId>
+    <artifactId>ezpay-backend</artifactId> <!-- your parent POM in root -->
+    <version>1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath> <!-- adjust if needed -->
+  </parent>
+
+  <groupId>com.ezpay.wallet</groupId>
+  <artifactId>infra-service</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <name>infra-service</name>
+  <description>Shared infrastructure module: Eureka, Kafka, Redis, etc.</description>
+
+  <dependencies>
+    <!-- Eureka Client -->
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+    </dependency>
+
+    <!-- Web starter: needed if it exposes configs like beans or health -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- Add more shared dependencies here (e.g., Kafka, Redis, Resilience4j, Logging) -->
+  </dependencies>
+</project>
